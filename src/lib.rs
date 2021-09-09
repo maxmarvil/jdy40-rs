@@ -10,6 +10,7 @@ use embedded_hal::serial::{Read, Write};
 use sh::hprintln;
 use embedded_hal::digital::v2::OutputPin;
 use cortex_m::asm::delay;
+use core::fmt::Debug;
 
 pub const OK_RESPONSE: [u8; 4] = *b"OK\r\n";
 
@@ -116,14 +117,14 @@ impl JdyMode {
 }
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone,Copy)]
 pub struct Config {
     speed: JdySpeed,
     power: JdyPower,
     mode: JdyMode,
-    network: [u8;4],
-    device: [u8;4],
-    channel: [u8;3],
+    network: &'static str,
+    device: &'static str,
+    channel: &'static str,
 }
 
 impl Default for Config {
@@ -132,9 +133,9 @@ impl Default for Config {
             speed: JdySpeed::Bods9600,
             power: JdyPower::Power6db,
             mode: JdyMode::ModeA0,
-            network: [6,5,4,3],
-            device: [0,0,1,0],
-            channel: [0,0,7],
+            network: "AT+RFID8899\r\n",//[8,8,9,9]\r\n
+            device: "AT+DVID1122\r\n",//[1,1,2,2]\r\n
+            channel: "AT+RFC001\r\n",//[0, 0, 1]\r\n
         }
     }
 }
@@ -164,6 +165,12 @@ impl<UART, CS, SET, D, E> Jdy40AT<UART, D, CS, SET> where
         };
 
         Ok(dev)
+    }
+
+    pub fn start(& mut self) {
+        self.cs.set_low().ok();
+        self.set.set_high().ok();
+        self.delay.delay_ms(100);
     }
 
     /// Init with default config
@@ -210,28 +217,30 @@ impl<UART, CS, SET, D, E> Jdy40AT<UART, D, CS, SET> where
             let _ = block!(self.serial.write(*ch));
         }
 
-        if !self.is_ok() {
-            return Err(Error::Write);
-        }
+        // if !self.is_ok() {
+        //     return Err(Error::Write);
+        // }
+        self.delay.delay_ms(150);
         Ok(())
     }
 
     pub fn set_config(& mut self, config: Config) -> Result<(), E> {
         self.cs.set_low().ok();
         self.set.set_low().ok();
+        self.delay.delay_ms(100);
 
-        self.delay.delay_ms(2);
+
         self.send_command(& config.power.get_value()).unwrap();
         self.send_command(& config.speed.get_value()).unwrap();
         self.send_command(& config.mode.get_value()).unwrap();
 
-        self.send_command(&config.network).unwrap();
-        self.send_command(&config.device).unwrap();
-        self.send_command(&config.channel).unwrap();
+        self.send_command(config.network.as_bytes()).unwrap();
+        self.send_command(config.device.as_bytes()).unwrap();
+        self.send_command(config.channel.as_bytes()).unwrap();
 
-        self.cs.set_high().ok();
         self.set.set_high().ok();
-        self.delay.delay_ms(2);
+        self.cs.set_low().ok();
+        self.delay.delay_ms(100);
         Ok(())
     }
 

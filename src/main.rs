@@ -41,12 +41,15 @@ fn main() -> ! {
     let mut set_pin = gpiob.pb8.into_push_pull_output();
     let mut led = gpioc.pc6.into_push_pull_output();
     let mut jdy = Jdy40AT::new(usart, delay,cs_pin,set_pin).unwrap();
+    jdy.start();
+
+    jdy.init();
 
     loop {
         led.toggle().unwrap();
-        let mut buf:[u8;1]=[0];;
-        jdy.read_buffer(& mut buf);
-        hprintln!("receive {}", buf.first());
+        let mut buf= b"go+\r\n";
+        jdy.write_buffer(buf);
+        hprintln!("send {:?}", buf);
         //writeln!(usart, "hello {}\r\n", byte).unwrap();
     }
 }
